@@ -1,4 +1,12 @@
 # product-startup
+> [!WARNING]
+> ## Deprecated
+>
+> This skill is no longer maintained and has been deprecated in favor of the newer [`product-discovery`](../product-discovery) skill.
+>
+> Please use `product-discovery` for all new work. This skill remains in the repository only for historical reference and may be removed in a future release.
+>
+> 
 Before any code gets written, run a structured conversation that forces clarity on what matters: 
 * "What are you building, and what problem does it solve?"
 * "Who specifically will use this, and what's their context when they reach for it?",

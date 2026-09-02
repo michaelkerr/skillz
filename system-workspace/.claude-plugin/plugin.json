@@ -1,0 +1,15 @@
+{
+  "name": "system-workspace",
+  "version": "1.0.0",
+  "description": "Generate workspace-level context for multi-repo systems. Reads each repo's AGENTS.md and produces a workspace AGENTS.md capturing shared conventions, cross-repo contracts, and workspace-wide constraints. Includes output templates and a deterministic eval script.",
+  "author": {
+    "name": "Michael Kerr"
+  },
+  "keywords": [
+    "workspace",
+    "multi-repo",
+    "monorepo",
+    "context",
+    "agents-md"
+  ]
+}

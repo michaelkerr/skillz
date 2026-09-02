@@ -2,7 +2,7 @@
 Output Quality Evaluator for product-evolution
 
 Validates the structural correctness of the evolved artifact set:
-ROADMAP.md, AGENTS.md (evolved), CLAUDE.md (stub), ARCHITECTURE.md, DECISIONS.md, README.md.
+ROADMAP.md, AGENTS.md (evolved), CLAUDE.md (stub), ARCHITECTURE.md, DECISIONS.md.
 
 This tests whether the artifacts are well-formed, not whether the content
 is good. Companion to product-discovery's eval_output_quality.py but for
@@ -254,6 +254,7 @@ EVOLVED_AGENTS_SECTIONS = [
     "Tech stack",
     "Architecture overview",
     "Project structure",
+    "Commands",
     "Conventions",
     "Module guide",
     "Do not",
@@ -310,7 +311,7 @@ class EvolvedAgentsMdChecker:
         else:
             self.result.findings.append(Finding(
                 "agents-md-sections", "PASS",
-                "All nine required sections present",
+                "All ten required sections present",
                 file="AGENTS.md",
             ))
 
@@ -647,114 +648,6 @@ class DecisionsChecker:
 
 
 # ---------------------------------------------------------------------------
-# README.md checks
-# ---------------------------------------------------------------------------
-
-README_REQUIRED_SECTIONS = [
-    ("intro", r"^#\s+\S"),
-    ("Getting started", r"##\s+Getting started"),
-]
-
-# Development section is expected for evolved projects but not strictly required.
-README_RECOMMENDED_SECTIONS = [
-    ("Development", r"##\s+Development"),
-]
-
-
-class ReadmeChecker:
-
-    def __init__(self, text: str, result: EvalResult):
-        self.text = text
-        self.result = result
-
-    def check_file_present(self) -> bool:
-        if not self.text.strip():
-            self.result.findings.append(Finding(
-                "readme-present", "FAIL",
-                "README.md is empty or missing",
-                file="README.md",
-            ))
-            return False
-        self.result.findings.append(Finding(
-            "readme-present", "PASS",
-            "README.md exists and is non-empty",
-            file="README.md",
-        ))
-        return True
-
-    def check_required_sections(self):
-        missing = []
-        for name, pattern in README_REQUIRED_SECTIONS:
-            if not re.search(pattern, self.text, re.MULTILINE | re.IGNORECASE):
-                missing.append(name)
-        if missing:
-            self.result.findings.append(Finding(
-                "readme-sections", "FAIL",
-                f"Missing sections: {', '.join(missing)}",
-                file="README.md",
-            ))
-        else:
-            self.result.findings.append(Finding(
-                "readme-sections", "PASS",
-                "Required sections present (intro, Getting started)",
-                file="README.md",
-            ))
-
-    def check_recommended_sections(self):
-        missing = []
-        for name, pattern in README_RECOMMENDED_SECTIONS:
-            if not re.search(pattern, self.text, re.MULTILINE | re.IGNORECASE):
-                missing.append(name)
-        if missing:
-            self.result.findings.append(Finding(
-                "readme-recommended", "WARN",
-                f"Recommended sections missing: {', '.join(missing)} "
-                f"(expected for evolved projects)",
-                file="README.md",
-            ))
-        else:
-            self.result.findings.append(Finding(
-                "readme-recommended", "PASS",
-                "Recommended sections present (Development)",
-                file="README.md",
-            ))
-
-    def check_no_prototype_language(self):
-        """Evolved projects should not describe themselves as prototypes."""
-        prototype_patterns = [
-            r"\bprototype\b",
-            r"\bproof of concept\b",
-            r"\bPOC\b",
-            r"\bexperiment\b",
-            r"\bjust a demo\b",
-        ]
-        # Check only the intro paragraph, not the entire file (decisions might
-        # reference prototype history).
-        intro = self.text[:500]
-        for pat in prototype_patterns:
-            if re.search(pat, intro, re.IGNORECASE):
-                self.result.findings.append(Finding(
-                    "readme-no-prototype", "WARN",
-                    f"README intro still uses prototype language (matched: '{pat}'). "
-                    f"Consider updating for the evolved product.",
-                    file="README.md",
-                ))
-                return
-        self.result.findings.append(Finding(
-            "readme-no-prototype", "PASS",
-            "No prototype language in README intro",
-            file="README.md",
-        ))
-
-    def run_all(self):
-        if not self.check_file_present():
-            return
-        self.check_required_sections()
-        self.check_recommended_sections()
-        self.check_no_prototype_language()
-
-
-# ---------------------------------------------------------------------------
 # BUILD_PLAN.archived.md check
 # ---------------------------------------------------------------------------
 
@@ -798,7 +691,6 @@ def evaluate_project(project_dir: Path) -> EvalResult:
     ClaudeMdStubChecker(_read("CLAUDE.md"), result).run_all()
     ArchitectureChecker(_read("ARCHITECTURE.md"), result).run_all()
     DecisionsChecker(_read("DECISIONS.md"), result).run_all()
-    ReadmeChecker(_read("README.md"), result).run_all()
     check_build_plan_archived(project_dir, result)
 
     return result

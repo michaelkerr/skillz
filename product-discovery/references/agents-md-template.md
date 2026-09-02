@@ -8,17 +8,23 @@ AGENTS.md is a context file for AI coding assistants. It contains only informati
 
 ## Required sections
 
-The file must contain exactly seven `##` sections in this order:
+The file must contain exactly nine `##` sections in this order:
 
-1. `## What this is` -- One paragraph from the product summary. State what the product does and for whom.
+1. `## What this is` -- One paragraph from the product summary. State what the product does and for whom. If this repo is part of a larger system, state how it relates to the other repos.
 2. `## Build protocol` -- Reference BUILD_PLAN.md. Define the test-first and step-approval workflow.
 3. `## Tech stack` -- Choices and brief rationale (one line per choice).
 4. `## Project structure` -- Top-level directory convention. Grows as the project grows.
-5. `## Conventions` -- Only conventions decided during the discovery conversation. One line each.
-6. `## Do not` -- Hard constraints from discovery. Things the project must not do.
-7. `## Decisions` -- Architectural decisions with rejected alternatives (one line each: "X over Y because Z").
+5. `## Commands` -- Exact commands to install, run, test, and lint. At startup this is sparse -- just the basics.
+6. `## Conventions` -- Only conventions decided during the discovery conversation. One line each.
+7. `## Do not` -- Hard constraints from discovery. Things the project must not do.
+8. `## Decisions` -- Architectural decisions with rejected alternatives (one line each: "X over Y because Z").
+9. `## Known issues` -- Empty at project start. Populated during the build loop when things break or behave unexpectedly.
 
 The top-level heading (`#`) is the project name.
+
+## Optional sections
+
+- `## Cross-repo dependencies` -- Include only if this repo is part of a multi-repo workspace. List what this repo consumes from and provides to other repos (API contracts, shared types, shared infra), with file paths to any shared contract files.
 
 ## What NOT to include
 
@@ -55,6 +61,12 @@ A dashboard that pre-computes daily Salesforce pipeline summaries so a sales man
 - API routes in /server/routes
 - Salesforce integration in /server/salesforce
 
+## Commands
+
+- `npm install` -- install dependencies
+- `npm run dev` -- start dev server
+- `npm test` -- run tests
+
 ## Conventions
 
 - All state management via useState/useReducer, no external state library
@@ -71,4 +83,8 @@ A dashboard that pre-computes daily Salesforce pipeline summaries so a sales man
 
 - SQLite over Postgres because this is a single-user local prototype
 - Server-side Salesforce calls (not client-side) because API keys must stay secret
+
+## Known issues
+
+(none yet)
 ```

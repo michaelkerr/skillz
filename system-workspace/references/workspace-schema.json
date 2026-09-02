@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Manifest listing repos in a multi-repo workspace. Lives at workspace.json in the workspace root.",
+  "type": "object",
+  "required": ["repos"],
+  "properties": {
+    "repos": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["path", "name"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path from the workspace root to the repo directory."
+          },
+          "name": {
+            "type": "string",
+            "description": "Short name for the repo, used in the workspace AGENTS.md."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

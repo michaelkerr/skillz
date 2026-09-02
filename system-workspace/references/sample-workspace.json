@@ -1,0 +1,12 @@
+{
+  "repos": [
+    {
+      "path": "../my-api",
+      "name": "my-api"
+    },
+    {
+      "path": "../my-web",
+      "name": "my-web"
+    }
+  ]
+}

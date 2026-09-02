@@ -2,8 +2,8 @@
 Output Quality Evaluator for product-startup
 
 Validates the structural correctness of BUILD_PLAN.md, AGENTS.md,
-CLAUDE.md, and README.md against the skill's requirements.  This tests
-whether the artifacts are well-formed, not whether the content is good.
+and CLAUDE.md against the skill's requirements.  This tests whether
+the artifacts are well-formed, not whether the content is good.
 
 Input:  Path to a project directory containing the three files.
 Output: Structured report to stdout.  Exit code 0 = all pass, 1 = any fail.
@@ -344,9 +344,11 @@ AGENTS_REQUIRED_SECTIONS = [
     "Build protocol",
     "Tech stack",
     "Project structure",
+    "Commands",
     "Conventions",
     "Do not",
     "Decisions",
+    "Known issues",
 ]
 
 SPECULATIVE_PATTERNS = [
@@ -385,7 +387,7 @@ class AgentsMdChecker:
         return True
 
     def check_required_sections(self):
-        """All seven required sections must appear as headings."""
+        """All nine required sections must appear as headings."""
         missing = []
         for section in AGENTS_REQUIRED_SECTIONS:
             pattern = rf"##\s+{re.escape(section)}"
@@ -400,7 +402,7 @@ class AgentsMdChecker:
         else:
             self.result.findings.append(Finding(
                 "agents-md-sections", "PASS",
-                "All seven required sections present",
+                "All nine required sections present",
                 file="AGENTS.md",
             ))
 
@@ -529,63 +531,6 @@ class ClaudeMdStubChecker:
 
 
 # ---------------------------------------------------------------------------
-# README.md checks
-# ---------------------------------------------------------------------------
-
-README_REQUIRED_SECTIONS = [
-    ("intro", r"^#\s+\S"),                        # Top-level heading + paragraph
-    ("Getting started", r"##\s+Getting started"),
-    ("Product decisions", r"##\s+Product decisions"),
-]
-
-
-class ReadmeChecker:
-
-    def __init__(self, text: str, result: EvalResult):
-        self.text = text
-        self.result = result
-
-    def check_file_present(self) -> bool:
-        if not self.text.strip():
-            self.result.findings.append(Finding(
-                "readme-present", "FAIL",
-                "README.md is empty or missing",
-                file="README.md",
-            ))
-            return False
-        self.result.findings.append(Finding(
-            "readme-present", "PASS",
-            "README.md exists and is non-empty",
-            file="README.md",
-        ))
-        return True
-
-    def check_required_sections(self):
-        missing = []
-        for name, pattern in README_REQUIRED_SECTIONS:
-            if not re.search(pattern, self.text, re.MULTILINE | re.IGNORECASE):
-                missing.append(name)
-        if missing:
-            self.result.findings.append(Finding(
-                "readme-sections", "FAIL",
-                f"Missing sections: {', '.join(missing)}",
-                file="README.md",
-            ))
-        else:
-            self.result.findings.append(Finding(
-                "readme-sections", "PASS",
-                "All required sections present (intro, Getting started, "
-                "Product decisions)",
-                file="README.md",
-            ))
-
-    def run_all(self):
-        if not self.check_file_present():
-            return
-        self.check_required_sections()
-
-
-# ---------------------------------------------------------------------------
 # Top-level runner
 # ---------------------------------------------------------------------------
 
@@ -601,7 +546,6 @@ def evaluate_project(project_dir: Path) -> EvalResult:
     BuildPlanChecker(_read("BUILD_PLAN.md"), result).run_all()
     AgentsMdChecker(_read("AGENTS.md"), result).run_all()
     ClaudeMdStubChecker(_read("CLAUDE.md"), result).run_all()
-    ReadmeChecker(_read("README.md"), result).run_all()
 
     return result
 

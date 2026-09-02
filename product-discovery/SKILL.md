@@ -5,7 +5,7 @@ description: Walk through a structured product discovery conversation before wri
 
 # Product Discovery
 
-Before any code gets written, run a structured conversation that forces clarity on what matters. The output is four artifacts: a sequenced build plan, an AGENTS.md context file, a CLAUDE.md import stub, and a README. No code until all four exist and the user confirms.
+Before any code gets written, run a structured conversation that forces clarity on what matters. The output is three artifacts: a sequenced build plan, an AGENTS.md context file, and a CLAUDE.md import stub. No code until all three exist and the user confirms.
 
 ## Why this exists
 
@@ -165,17 +165,11 @@ This ensures Claude Code imports the AGENTS.md context automatically while keepi
 - Rationale paragraphs (keep entries to 1-2 lines)
 - Anything speculative ("we might later want to...")
 
-## Phase 3b: README.md
-
-The README is the human-facing document. It contains what AGENTS.md deliberately excludes: rationale, product context, and setup instructions.
-
-Read `references/readme-template.md` for the exact format. Follow it precisely.
-
 When a step's "What it does" cannot be stated in one sentence, or its "What good looks like" requires more than one input/output example to cover the cases, write a brief in `/docs/{feature-name}.md` instead. This should be rare. A one-pager, not a PRD.
 
 ### Verifying all outputs
 
-After writing all three files, run the output quality eval against the project directory:
+After writing both files, run the output quality eval against the project directory:
 
 ```
 python ${CLAUDE_PLUGIN_ROOT}/references/eval_output_quality.py <project-dir>
@@ -187,13 +181,12 @@ Fix any FAIL findings. Present the results to the user only after the eval passe
 
 ### Handoff
 
-Save four files to the project root:
+Save three files to the project root:
 1. `AGENTS.md` (from Phase 3)
 2. `CLAUDE.md` (from Phase 3 -- contains only `@agents.md`)
 3. `BUILD_PLAN.md` (from Phase 2)
-4. `README.md` (from Phase 3b)
 
-Tell the user: these are starting points. The build plan will evolve as you build. AGENTS.md will grow with every step. README.md gets updated when setup steps change or product decisions are made. Ready to start Step 1?
+Tell the user: these are starting points. The build plan will evolve as you build. AGENTS.md will grow with every step. Ready to start Step 1?
 
 ### The build loop
 

@@ -28,7 +28,6 @@ Read the existing artifacts and codebase before changing anything.
 Read all existing coordination artifacts:
 - AGENTS.md
 - BUILD_PLAN.md
-- README.md
 - Any /docs/ directory contents
 - DECISIONS.md, ARCHITECTURE.md, CHANGELOG.md if they exist
 
@@ -131,15 +130,6 @@ Read `references/decisions-template.md` for the exact format. Follow it precisel
 
 Seed this with decisions already captured in AGENTS.md's Decisions section and any significant choices documented in BUILD_PLAN.md notes. Those entries move here; AGENTS.md's Decisions section is replaced with a pointer to DECISIONS.md.
 
-### 3.5 Update README.md
-
-The README should reflect the product's current state:
-
-- Update the feature description to match the product as it exists now
-- Ensure setup and run instructions are current and tested
-- Add a "Development" section if one does not exist, covering how to run tests, lint, and build
-- Remove any language that frames this as a prototype or experiment (unless it still is)
-
 ### Verifying all outputs
 
 After writing all artifacts, run the output quality eval against the project directory:
@@ -181,13 +171,11 @@ In the project root:
 3. `CLAUDE.md` (from 3.2 -- contains only `@agents.md`)
 4. `ARCHITECTURE.md` (from 3.3)
 5. `DECISIONS.md` (from 3.4)
-6. Updated `README.md` (from 3.5)
 
 ### 4.3 Verify coherence
 
 Check that:
 - AGENTS.md's module guide covers everything in ARCHITECTURE.md's component map
-- ROADMAP.md's "What's built" matches README.md's feature description
 - All decisions from AGENTS.md and BUILD_PLAN.md notes are captured in DECISIONS.md
 - AGENTS.md's work protocol references ROADMAP.md, not BUILD_PLAN.md
 - CLAUDE.md contains only `@agents.md`

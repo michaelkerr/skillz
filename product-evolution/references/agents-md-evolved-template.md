@@ -8,19 +8,24 @@ At maturity, AGENTS.md carries more weight than the startup version. The project
 
 ## Required sections
 
-The file must contain exactly nine `##` sections in this order:
+The file must contain exactly ten `##` sections in this order:
 
-1. `## What this is` -- one paragraph reflecting the product's current state, not its original pitch.
+1. `## What this is` -- one paragraph reflecting the product's current state, not its original pitch. If this repo is part of a larger system, state how it relates to the other repos.
 2. `## Work protocol` -- references ROADMAP.md, defines the pick-and-work loop, regression safety, and artifact maintenance.
 3. `## Tech stack` -- what is actually in use, from dependency manifests and code. Include versions for major dependencies. Note upgrade constraints.
 4. `## Architecture overview` -- brief summary pointing to ARCHITECTURE.md for detail.
 5. `## Project structure` -- more detailed than startup phase. Document every major directory and its purpose. Include naming conventions per directory.
-6. `## Conventions` -- expanded and more prescriptive. Group by category. Each convention includes a brief "because" rationale.
-7. `## Module guide` -- for codebases too large to read entirely, tells the AI where to look. Lists every major functional area with its entry point and key files.
-8. `## Do not` -- more entries than at startup. Includes lessons learned from things that went wrong.
-9. `## Known issues` -- things that are broken or fragile but not yet fixed. Prevents the AI from investigating known problems.
+6. `## Commands` -- exact commands to install, run, test, lint, build, and deploy. Derived from the actual project configuration, not guessed.
+7. `## Conventions` -- expanded and more prescriptive. Group by category. Each convention includes a brief "because" rationale.
+8. `## Module guide` -- for codebases too large to read entirely, tells the AI where to look. Lists every major functional area with its entry point and key files.
+9. `## Do not` -- more entries than at startup. Includes lessons learned from things that went wrong.
+10. `## Known issues` -- things that are broken or fragile but not yet fixed. Prevents the AI from investigating known problems.
 
 The top-level heading (`#`) is the project name.
+
+## Optional sections
+
+- `## Cross-repo dependencies` -- Include only if this repo is part of a multi-repo workspace. List what this repo consumes from and provides to other repos (API contracts, shared types, shared infra), with file paths to any shared contract files.
 
 ## What NOT to include
 
@@ -82,6 +87,15 @@ Three-layer architecture: React frontend, Express API proxy, SQLite cache. Sales
 - `/server/jobs/` -- Scheduled jobs (daily fetch, weekly email)
 - `/tests/` -- mirrors src/ and server/ structure
 - `/migrations/` -- SQLite schema migrations, numbered sequentially
+
+## Commands
+
+- `npm install` -- install dependencies
+- `npm run dev` -- start frontend and backend in dev mode
+- `npm test` -- run Vitest suite
+- `npm run lint` -- ESLint check
+- `npm run build` -- production build
+- `npm run db:migrate` -- run pending SQLite migrations
 
 ## Conventions
 

@@ -1,9 +1,9 @@
 """
 Output Quality Evaluator for product-startup
 
-Validates the structural correctness of BUILD_PLAN.md, CLAUDE.md, and
-README.md against the skill's requirements.  This tests whether the
-artifacts are well-formed, not whether the content is good.
+Validates the structural correctness of BUILD_PLAN.md, AGENTS.md,
+CLAUDE.md, and README.md against the skill's requirements.  This tests
+whether the artifacts are well-formed, not whether the content is good.
 
 Input:  Path to a project directory containing the three files.
 Output: Structured report to stdout.  Exit code 0 = all pass, 1 = any fail.
@@ -336,10 +336,10 @@ class BuildPlanChecker:
 
 
 # ---------------------------------------------------------------------------
-# CLAUDE.md checks
+# AGENTS.md checks
 # ---------------------------------------------------------------------------
 
-CLAUDE_REQUIRED_SECTIONS = [
+AGENTS_REQUIRED_SECTIONS = [
     "What this is",
     "Build protocol",
     "Tech stack",
@@ -363,7 +363,130 @@ SPECULATIVE_PATTERNS = [
 ]
 
 
-class ClaudeMdChecker:
+class AgentsMdChecker:
+
+    def __init__(self, text: str, result: EvalResult):
+        self.text = text
+        self.result = result
+
+    def check_file_present(self) -> bool:
+        if not self.text.strip():
+            self.result.findings.append(Finding(
+                "agents-md-present", "FAIL",
+                "AGENTS.md is empty or missing",
+                file="AGENTS.md",
+            ))
+            return False
+        self.result.findings.append(Finding(
+            "agents-md-present", "PASS",
+            "AGENTS.md exists and is non-empty",
+            file="AGENTS.md",
+        ))
+        return True
+
+    def check_required_sections(self):
+        """All seven required sections must appear as headings."""
+        missing = []
+        for section in AGENTS_REQUIRED_SECTIONS:
+            pattern = rf"##\s+{re.escape(section)}"
+            if not re.search(pattern, self.text, re.IGNORECASE):
+                missing.append(section)
+        if missing:
+            self.result.findings.append(Finding(
+                "agents-md-sections", "FAIL",
+                f"Missing sections: {', '.join(missing)}",
+                file="AGENTS.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "agents-md-sections", "PASS",
+                "All seven required sections present",
+                file="AGENTS.md",
+            ))
+
+    def check_no_speculation(self):
+        """The skill forbids speculative content like 'we might later want to...'."""
+        hits = []
+        for i, line in enumerate(self.text.splitlines(), 1):
+            for pat in SPECULATIVE_PATTERNS:
+                if re.search(pat, line, re.IGNORECASE):
+                    hits.append((i, line.strip()[:80]))
+                    break
+        if hits:
+            examples = "; ".join(
+                f"line {n}: '{txt}'" for n, txt in hits[:3]
+            )
+            self.result.findings.append(Finding(
+                "agents-md-no-speculation", "FAIL",
+                f"Speculative content found ({len(hits)} instance(s)): {examples}",
+                file="AGENTS.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "agents-md-no-speculation", "PASS",
+                "No speculative content detected",
+                file="AGENTS.md",
+            ))
+
+    def check_build_protocol_content(self):
+        """Build protocol section must reference BUILD_PLAN.md."""
+        match = re.search(
+            r"##\s+Build protocol\s*\n(.*?)(?=\n##\s|\Z)",
+            self.text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if not match:
+            return
+        content = match.group(1)
+        if "BUILD_PLAN.md" in content or "build plan" in content.lower():
+            self.result.findings.append(Finding(
+                "agents-md-build-protocol-ref", "PASS",
+                "Build protocol references BUILD_PLAN.md",
+                file="AGENTS.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "agents-md-build-protocol-ref", "WARN",
+                "Build protocol does not reference BUILD_PLAN.md",
+                file="AGENTS.md",
+            ))
+
+    def check_no_progress_tracking(self):
+        """AGENTS.md must not contain progress tracking or session notes."""
+        progress_patterns = [
+            r"##\s+(Progress|Status|Session\s+notes|Log)",
+            r"completed step \d+",
+            r"session \d+:",
+        ]
+        for pat in progress_patterns:
+            if re.search(pat, self.text, re.IGNORECASE):
+                self.result.findings.append(Finding(
+                    "agents-md-no-progress", "WARN",
+                    f"AGENTS.md appears to contain progress tracking "
+                    f"(matched: '{pat}')",
+                    file="AGENTS.md",
+                ))
+                return
+        self.result.findings.append(Finding(
+            "agents-md-no-progress", "PASS",
+            "No progress tracking or session notes detected",
+            file="AGENTS.md",
+        ))
+
+    def run_all(self):
+        if not self.check_file_present():
+            return
+        self.check_required_sections()
+        self.check_no_speculation()
+        self.check_build_protocol_content()
+        self.check_no_progress_tracking()
+
+
+# ---------------------------------------------------------------------------
+# CLAUDE.md stub checks
+# ---------------------------------------------------------------------------
+
+class ClaudeMdStubChecker:
 
     def __init__(self, text: str, result: EvalResult):
         self.text = text
@@ -384,103 +507,25 @@ class ClaudeMdChecker:
         ))
         return True
 
-    def check_required_sections(self):
-        """All seven required sections must appear as headings."""
-        missing = []
-        for section in CLAUDE_REQUIRED_SECTIONS:
-            pattern = rf"##\s+{re.escape(section)}"
-            if not re.search(pattern, self.text, re.IGNORECASE):
-                missing.append(section)
-        if missing:
+    def check_imports_agents(self):
+        """CLAUDE.md should contain @agents.md to import the context file."""
+        if "@agents.md" in self.text:
             self.result.findings.append(Finding(
-                "claude-md-sections", "FAIL",
-                f"Missing sections: {', '.join(missing)}",
+                "claude-md-imports-agents", "PASS",
+                "CLAUDE.md contains @agents.md import",
                 file="CLAUDE.md",
             ))
         else:
             self.result.findings.append(Finding(
-                "claude-md-sections", "PASS",
-                "All seven required sections present",
+                "claude-md-imports-agents", "FAIL",
+                "CLAUDE.md does not contain @agents.md import",
                 file="CLAUDE.md",
             ))
-
-    def check_no_speculation(self):
-        """The skill forbids speculative content like 'we might later want to...'."""
-        hits = []
-        for i, line in enumerate(self.text.splitlines(), 1):
-            for pat in SPECULATIVE_PATTERNS:
-                if re.search(pat, line, re.IGNORECASE):
-                    hits.append((i, line.strip()[:80]))
-                    break
-        if hits:
-            examples = "; ".join(
-                f"line {n}: '{txt}'" for n, txt in hits[:3]
-            )
-            self.result.findings.append(Finding(
-                "claude-md-no-speculation", "FAIL",
-                f"Speculative content found ({len(hits)} instance(s)): {examples}",
-                file="CLAUDE.md",
-            ))
-        else:
-            self.result.findings.append(Finding(
-                "claude-md-no-speculation", "PASS",
-                "No speculative content detected",
-                file="CLAUDE.md",
-            ))
-
-    def check_build_protocol_content(self):
-        """Build protocol section must reference BUILD_PLAN.md."""
-        # Extract build protocol section.
-        match = re.search(
-            r"##\s+Build protocol\s*\n(.*?)(?=\n##\s|\Z)",
-            self.text,
-            re.DOTALL | re.IGNORECASE,
-        )
-        if not match:
-            return  # Already caught by section check.
-        content = match.group(1)
-        if "BUILD_PLAN.md" in content or "build plan" in content.lower():
-            self.result.findings.append(Finding(
-                "claude-md-build-protocol-ref", "PASS",
-                "Build protocol references BUILD_PLAN.md",
-                file="CLAUDE.md",
-            ))
-        else:
-            self.result.findings.append(Finding(
-                "claude-md-build-protocol-ref", "WARN",
-                "Build protocol does not reference BUILD_PLAN.md",
-                file="CLAUDE.md",
-            ))
-
-    def check_no_progress_tracking(self):
-        """CLAUDE.md must not contain progress tracking or session notes."""
-        progress_patterns = [
-            r"##\s+(Progress|Status|Session\s+notes|Log)",
-            r"completed step \d+",
-            r"session \d+:",
-        ]
-        for pat in progress_patterns:
-            if re.search(pat, self.text, re.IGNORECASE):
-                self.result.findings.append(Finding(
-                    "claude-md-no-progress", "WARN",
-                    f"CLAUDE.md appears to contain progress tracking "
-                    f"(matched: '{pat}')",
-                    file="CLAUDE.md",
-                ))
-                return
-        self.result.findings.append(Finding(
-            "claude-md-no-progress", "PASS",
-            "No progress tracking or session notes detected",
-            file="CLAUDE.md",
-        ))
 
     def run_all(self):
         if not self.check_file_present():
             return
-        self.check_required_sections()
-        self.check_no_speculation()
-        self.check_build_protocol_content()
-        self.check_no_progress_tracking()
+        self.check_imports_agents()
 
 
 # ---------------------------------------------------------------------------
@@ -554,7 +599,8 @@ def evaluate_project(project_dir: Path) -> EvalResult:
         return ""
 
     BuildPlanChecker(_read("BUILD_PLAN.md"), result).run_all()
-    ClaudeMdChecker(_read("CLAUDE.md"), result).run_all()
+    AgentsMdChecker(_read("AGENTS.md"), result).run_all()
+    ClaudeMdStubChecker(_read("CLAUDE.md"), result).run_all()
     ReadmeChecker(_read("README.md"), result).run_all()
 
     return result

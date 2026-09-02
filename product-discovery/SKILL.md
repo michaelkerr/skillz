@@ -1,11 +1,11 @@
 ---
 name: product-discovery
-description: Walk through a structured product discovery conversation before writing any code, then produce a sequenced build plan and initial CLAUDE.md context file. Use this skill whenever someone wants to start a new product, app, tool, or prototype from scratch, or says things like "I want to build...", "let's start a new project", "help me plan an app", "new product idea", or "I have an idea for...". Also trigger when someone has described what they want to build and is about to jump straight into code -- redirect them through this process first. Do NOT use for adding features to an existing codebase or for non-software projects.
+description: Walk through a structured product discovery conversation before writing any code, then produce a sequenced build plan and initial AGENTS.md context file. Use this skill whenever someone wants to start a new product, app, tool, or prototype from scratch, or says things like "I want to build...", "let's start a new project", "help me plan an app", "new product idea", or "I have an idea for...". Also trigger when someone has described what they want to build and is about to jump straight into code -- redirect them through this process first. Do NOT use for adding features to an existing codebase or for non-software projects.
 ---
 
 # Product Discovery
 
-Before any code gets written, run a structured conversation that forces clarity on what matters. The output is three artifacts: a sequenced build plan, an initial CLAUDE.md context file, and a README. No code until all three exist and the user confirms.
+Before any code gets written, run a structured conversation that forces clarity on what matters. The output is four artifacts: a sequenced build plan, an AGENTS.md context file, a CLAUDE.md import stub, and a README. No code until all four exist and the user confirms.
 
 ## Why this exists
 
@@ -146,20 +146,28 @@ Typical projects have 5-12 steps. If you have more than 15, the scope is too big
 
 Steps can be added, removed, reordered, or split during the build. The plan is a coordination tool, not a contract.
 
-## Phase 3: Initial Context File
+## Phase 3: Initial Context Files
 
-Generate a CLAUDE.md file based on the discovery conversation. At project start, this file is short. It grows as the project grows.
+Generate an AGENTS.md file based on the discovery conversation. At project start, this file is short. It grows as the project grows.
 
-Read `references/claude-md-template.md` for the exact format. Follow it precisely.
+Read `references/agents-md-template.md` for the exact format. Follow it precisely.
 
-### What NOT to include
+Also create a CLAUDE.md file in the project root containing only:
+
+```
+@agents.md
+```
+
+This ensures Claude Code imports the AGENTS.md context automatically while keeping the actual content in a tool-agnostic file that works across AI coding assistants.
+
+### What NOT to include in AGENTS.md
 - Product strategy, user personas, market analysis (these don't change AI behavior)
 - Rationale paragraphs (keep entries to 1-2 lines)
 - Anything speculative ("we might later want to...")
 
 ## Phase 3b: README.md
 
-The README is the human-facing document. It contains what CLAUDE.md deliberately excludes: rationale, product context, and setup instructions.
+The README is the human-facing document. It contains what AGENTS.md deliberately excludes: rationale, product context, and setup instructions.
 
 Read `references/readme-template.md` for the exact format. Follow it precisely.
 
@@ -179,12 +187,13 @@ Fix any FAIL findings. Present the results to the user only after the eval passe
 
 ### Handoff
 
-Save three files to the project root:
-1. `CLAUDE.md` (from Phase 3)
-2. `BUILD_PLAN.md` (from Phase 2)
-3. `README.md` (from Phase 3b)
+Save four files to the project root:
+1. `AGENTS.md` (from Phase 3)
+2. `CLAUDE.md` (from Phase 3 -- contains only `@agents.md`)
+3. `BUILD_PLAN.md` (from Phase 2)
+4. `README.md` (from Phase 3b)
 
-Tell the user: these are starting points. The build plan will evolve as you build. The CLAUDE.md will grow with every step. README.md gets updated when setup steps change or product decisions are made. Ready to start Step 1?
+Tell the user: these are starting points. The build plan will evolve as you build. AGENTS.md will grow with every step. README.md gets updated when setup steps change or product decisions are made. Ready to start Step 1?
 
 ### The build loop
 
@@ -197,23 +206,23 @@ Once the user confirms, the ongoing workflow is:
 5. **Present for evaluation.** Tell the user what you built, what tests pass, and how to run/evaluate it. Wait for their response.
 6. **Iterate or advance.**
    - If the user identifies problems: fix them, present again.
-   - If the user approves: mark the step "complete" in BUILD_PLAN.md. Fill in the Notes field with: patterns established, unexpected complexity encountered, or scope changes made. For "manual" steps that don't already have a test, write a regression test for the approved behavior so later steps don't break it (test structural invariants, not subjective quality). Update CLAUDE.md if new conventions or structural decisions emerged.
+   - If the user approves: mark the step "complete" in BUILD_PLAN.md. Fill in the Notes field with: patterns established, unexpected complexity encountered, or scope changes made. For "manual" steps that don't already have a test, write a regression test for the approved behavior so later steps don't break it (test structural invariants, not subjective quality). Update AGENTS.md if new conventions or structural decisions emerged.
 7. **Check the plan.** Before starting the next step, verify two things: (a) the next step's "Builds on" dependency is satisfied by the current state, and (b) no information from the completed step invalidates a future step's assumptions. If either check fails, update BUILD_PLAN.md and confirm the changes with the user.
 8. **Repeat from 1.**
 
-### What triggers a CLAUDE.md update
+### What triggers an AGENTS.md update
 
-Not every step produces a CLAUDE.md change. Update it when:
+Not every step produces an AGENTS.md change. Update it when:
 - A new file/folder pattern is established (first component, first API route, first test file)
 - The same library, pattern, or structural choice is used across two or more steps ("we're using fetch, not axios" -- write it down so it stays consistent)
 - A structural decision is made ("state lives in URL params, not React state")
 - A library, API, or approach is abandoned mid-step due to an incompatibility or limitation -- record the specific failure so it is not re-attempted
 
-Do not update CLAUDE.md with progress tracking, status, or session notes. That's what BUILD_PLAN.md is for.
+Do not update AGENTS.md with progress tracking, status, or session notes. That's what BUILD_PLAN.md is for.
 
 ### New sessions
 
-When the user starts a new conversation about this project, read CLAUDE.md and BUILD_PLAN.md first. Pick up from the last incomplete step. Do not ask the user to re-explain the project.
+When the user starts a new conversation about this project, read AGENTS.md and BUILD_PLAN.md first. Pick up from the last incomplete step. Do not ask the user to re-explain the project.
 
 ## Interaction Style
 

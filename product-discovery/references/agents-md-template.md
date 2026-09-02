@@ -1,10 +1,10 @@
-# CLAUDE.md Template
+# AGENTS.md Template
 
-Save this file as `CLAUDE.md` in the project root. Follow this format exactly.
+Save this file as `AGENTS.md` in the project root. Follow this format exactly. Also create a `CLAUDE.md` in the project root containing only `@agents.md` so that Claude Code imports this file automatically.
 
 ## Purpose
 
-CLAUDE.md is a context file for AI coding assistants. It contains only information that changes AI behavior: structural decisions, conventions, constraints, and workflow rules. It is short at project start and grows as the project grows.
+AGENTS.md is a context file for AI coding assistants. It contains only information that changes AI behavior: structural decisions, conventions, constraints, and workflow rules. It is short at project start and grows as the project grows.
 
 ## Required sections
 

@@ -410,6 +410,221 @@ class WorkspaceAgentsMdChecker:
 
 
 # ---------------------------------------------------------------------------
+# Workspace ROADMAP.md checks
+# ---------------------------------------------------------------------------
+
+ROADMAP_REQUIRED_SECTIONS = [
+    "System summary",
+    "Now",
+    "Next",
+    "Later",
+    "Parked",
+]
+
+ROADMAP_NOW_REQUIRED_FIELDS = [
+    "Type",
+    "What it does",
+    "Repos",
+    "Sequence",
+    "Done when",
+    "Notes",
+]
+
+ROADMAP_VALID_TYPES = {
+    "migration", "integration", "infrastructure", "convention", "contract-change",
+}
+
+
+class WorkspaceRoadmapChecker:
+
+    def __init__(self, text: str, result: EvalResult):
+        self.text = text
+        self.result = result
+
+    def check_file_present(self) -> bool:
+        if not self.text.strip():
+            self.result.findings.append(Finding(
+                "roadmap-present", "WARN",
+                "ROADMAP.md is missing (optional but recommended)",
+                file="ROADMAP.md",
+            ))
+            return False
+        self.result.findings.append(Finding(
+            "roadmap-present", "PASS",
+            "ROADMAP.md exists and is non-empty",
+            file="ROADMAP.md",
+        ))
+        return True
+
+    def check_required_sections(self):
+        missing = []
+        for section in ROADMAP_REQUIRED_SECTIONS:
+            pattern = rf"##\s+{re.escape(section)}"
+            if not re.search(pattern, self.text, re.IGNORECASE):
+                missing.append(section)
+        if missing:
+            self.result.findings.append(Finding(
+                "roadmap-sections", "FAIL",
+                f"Missing sections: {', '.join(missing)}",
+                file="ROADMAP.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "roadmap-sections", "PASS",
+                "All five required sections present",
+                file="ROADMAP.md",
+            ))
+
+    def check_line_count(self):
+        lines = len(self.text.splitlines())
+        if lines > 80:
+            self.result.findings.append(Finding(
+                "roadmap-line-count", "FAIL",
+                f"ROADMAP.md is {lines} lines; must be under 80",
+                file="ROADMAP.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "roadmap-line-count", "PASS",
+                f"ROADMAP.md is {lines} lines (under 80)",
+                file="ROADMAP.md",
+            ))
+
+    def check_now_item_format(self):
+        now_match = re.search(
+            r"##\s+Now\s*\n(.*?)(?=\n##\s|\Z)",
+            self.text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if not now_match:
+            return
+        now_content = now_match.group(1)
+        items = re.findall(r"###\s+(.+)", now_content)
+        if not items:
+            return
+        issues = []
+        for item_name in items:
+            item_pattern = rf"###\s+{re.escape(item_name)}\s*\n(.*?)(?=\n###\s|\n##\s|\Z)"
+            item_match = re.search(item_pattern, self.text, re.DOTALL)
+            if not item_match:
+                continue
+            item_body = item_match.group(1)
+            for field in ROADMAP_NOW_REQUIRED_FIELDS:
+                if f"**{field}**" not in item_body:
+                    issues.append(f"'{item_name}' missing **{field}**")
+        if issues:
+            self.result.findings.append(Finding(
+                "roadmap-now-format", "FAIL",
+                f"NOW item format issues: {'; '.join(issues[:5])}",
+                file="ROADMAP.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "roadmap-now-format", "PASS",
+                f"All {len(items)} NOW item(s) have required fields",
+                file="ROADMAP.md",
+            ))
+
+    def check_now_item_types(self):
+        now_match = re.search(
+            r"##\s+Now\s*\n(.*?)(?=\n##\s|\Z)",
+            self.text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if not now_match:
+            return
+        types_found = re.findall(
+            r"\*\*Type\*\*:\s*(\S+)", now_match.group(1)
+        )
+        invalid = [t for t in types_found if t not in ROADMAP_VALID_TYPES]
+        if invalid:
+            self.result.findings.append(Finding(
+                "roadmap-now-types", "WARN",
+                f"Unexpected NOW item types: {', '.join(invalid)}. "
+                f"Expected: {', '.join(sorted(ROADMAP_VALID_TYPES))}",
+                file="ROADMAP.md",
+            ))
+        elif types_found:
+            self.result.findings.append(Finding(
+                "roadmap-now-types", "PASS",
+                f"All NOW item types are valid",
+                file="ROADMAP.md",
+            ))
+
+    def check_no_single_repo_items(self):
+        now_match = re.search(
+            r"##\s+Now\s*\n(.*?)(?=\n##\s|\Z)",
+            self.text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if not now_match:
+            return
+        items = re.findall(r"###\s+(.+)", now_match.group(1))
+        issues = []
+        for item_name in items:
+            item_pattern = rf"###\s+{re.escape(item_name)}\s*\n(.*?)(?=\n###\s|\n##\s|\Z)"
+            item_match = re.search(item_pattern, self.text, re.DOTALL)
+            if not item_match:
+                continue
+            repos_match = re.search(
+                r"\*\*Repos\*\*:\s*(.+)", item_match.group(1)
+            )
+            if repos_match:
+                repos_text = repos_match.group(1).strip()
+                commas = repos_text.count(",")
+                parens = repos_text.count("(")
+                if commas == 0 and parens <= 1:
+                    issues.append(
+                        f"'{item_name}' may reference only one repo"
+                    )
+        if issues:
+            self.result.findings.append(Finding(
+                "roadmap-cross-repo", "WARN",
+                f"Items may not be cross-repo: {'; '.join(issues)}",
+                file="ROADMAP.md",
+            ))
+        elif items:
+            self.result.findings.append(Finding(
+                "roadmap-cross-repo", "PASS",
+                "NOW items reference multiple repos",
+                file="ROADMAP.md",
+            ))
+
+    def check_no_speculation(self):
+        hits = []
+        for i, line in enumerate(self.text.splitlines(), 1):
+            for pat in SPECULATIVE_PATTERNS:
+                if re.search(pat, line, re.IGNORECASE):
+                    hits.append((i, line.strip()[:80]))
+                    break
+        if hits:
+            examples = "; ".join(
+                f"line {n}: '{txt}'" for n, txt in hits[:3]
+            )
+            self.result.findings.append(Finding(
+                "roadmap-no-speculation", "FAIL",
+                f"Speculative content found ({len(hits)} instance(s)): {examples}",
+                file="ROADMAP.md",
+            ))
+        else:
+            self.result.findings.append(Finding(
+                "roadmap-no-speculation", "PASS",
+                "No speculative content detected",
+                file="ROADMAP.md",
+            ))
+
+    def run_all(self):
+        if not self.check_file_present():
+            return
+        self.check_required_sections()
+        self.check_line_count()
+        self.check_now_item_format()
+        self.check_now_item_types()
+        self.check_no_single_repo_items()
+        self.check_no_speculation()
+
+
+# ---------------------------------------------------------------------------
 # CLAUDE.md stub checks
 # ---------------------------------------------------------------------------
 
@@ -479,6 +694,8 @@ def evaluate_project(workspace_dir: Path) -> EvalResult:
 
     agents_checker = WorkspaceAgentsMdChecker(_read("AGENTS.md"), result)
     agents_checker.run_all(manifest_names=manifest_names)
+
+    WorkspaceRoadmapChecker(_read("ROADMAP.md"), result).run_all()
 
     ClaudeMdStubChecker(_read("CLAUDE.md"), result).run_all()
 

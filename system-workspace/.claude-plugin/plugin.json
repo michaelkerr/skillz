@@ -1,7 +1,7 @@
 {
   "name": "system-workspace",
-  "version": "1.0.0",
-  "description": "Generate workspace-level context for multi-repo systems. Reads each repo's AGENTS.md and produces a workspace AGENTS.md capturing shared conventions, cross-repo contracts, and workspace-wide constraints. Includes output templates and a deterministic eval script.",
+  "version": "1.1.0",
+  "description": "Generate workspace-level context and roadmap for multi-repo systems. Reads each repo's AGENTS.md and ROADMAP.md, then produces a workspace AGENTS.md (shared conventions, cross-repo contracts, constraints) and a workspace ROADMAP.md (cross-repo work items in NOW/NEXT/LATER/PARKED buckets). Includes output templates and a deterministic eval script.",
   "author": {
     "name": "Michael Kerr"
   },

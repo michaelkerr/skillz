@@ -6,10 +6,11 @@ A Claude Code plugin for generating workspace-level context across multiple repo
 
 When working across multiple repos, each repo's own AGENTS.md covers its stack, structure, and conventions. But nothing captures how the repos relate to each other. This skill fills that gap.
 
-It reads the per-repo AGENTS.md files and produces:
+It reads the per-repo AGENTS.md and ROADMAP.md files and produces:
 1. **workspace.json** — manifest listing repos in the workspace (created interactively if missing)
 2. **AGENTS.md** — workspace-level context with four sections: Repos, Cross-repo contracts, Shared conventions, Do not
-3. **CLAUDE.md** — import stub (`@agents.md`)
+3. **ROADMAP.md** — cross-repo roadmap with NOW/NEXT/LATER/PARKED buckets for work spanning multiple repos
+4. **CLAUDE.md** — import stub (`@agents.md`)
 
 ## When to use
 
@@ -27,6 +28,7 @@ Do **not** use for single-repo projects. Each repo's own AGENTS.md is sufficient
 | `references/workspace-schema.json` | JSON schema for workspace.json |
 | `references/sample-workspace.json` | Example workspace.json |
 | `references/workspace-agents-template.md` | Template and format spec for workspace AGENTS.md |
+| `references/workspace-roadmap-template.md` | Template and format spec for workspace ROADMAP.md |
 | `references/eval_workspace_quality.py` | Validates structural correctness of generated artifacts |
 
 ## Eval script

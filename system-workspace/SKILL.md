@@ -1,11 +1,11 @@
 ---
 name: system-workspace
-description: Generate workspace-level context for a multi-repo system. Reads each repo's AGENTS.md (listed in workspace.json), then produces a workspace AGENTS.md capturing only what is true across repos -- shared conventions, cross-repo contracts, and workspace-wide constraints. Use when setting up or refreshing context for a workspace that coordinates multiple repos. Do NOT use for single-repo projects.
+description: Generate workspace-level context and roadmap for a multi-repo system. Reads each repo's AGENTS.md and ROADMAP.md (listed in workspace.json), then produces a workspace AGENTS.md capturing cross-cutting concerns and a workspace ROADMAP.md for work that spans multiple repos. Use when setting up or refreshing context for a workspace that coordinates multiple repos. Do NOT use for single-repo projects.
 ---
 
 # System Workspace
 
-Generate workspace-level context that ties multiple repos together. Each repo already has its own AGENTS.md (produced by product-discovery or product-evolution). This skill reads those per-repo files and produces a thin workspace-level AGENTS.md capturing only cross-cutting concerns.
+Generate workspace-level context and roadmap that ties multiple repos together. Each repo already has its own AGENTS.md and ROADMAP.md (produced by product-discovery or product-evolution). This skill reads those per-repo files and produces a thin workspace-level AGENTS.md capturing cross-cutting concerns and a workspace ROADMAP.md for cross-repo work items.
 
 ## When to use this
 
@@ -42,13 +42,14 @@ If there are fewer than two repos, stop. A workspace-level context file is not u
 For each entry in `workspace.json`:
 1. Resolve the `path` relative to this directory
 2. Read `AGENTS.md` at that path
-3. If no AGENTS.md exists, note the repo as missing context and continue
+3. Read `ROADMAP.md` at that path (if it exists)
+4. If no AGENTS.md exists, note the repo as missing context and continue
 
 If fewer than two repos have an AGENTS.md, stop. A workspace-level context file is not useful until at least two repos have their own context established.
 
 ## Phase 3: Generate Workspace Context
 
-Produce two files in this directory:
+Produce three files in this directory:
 
 ### 3.1 AGENTS.md
 
@@ -67,7 +68,25 @@ Rules:
 - Keep the file under 100 lines. Terse and factual.
 - Flag anything inferred rather than confirmed from the files with **[INFERRED]**.
 
-### 3.2 CLAUDE.md
+### 3.2 ROADMAP.md
+
+Read `references/workspace-roadmap-template.md` for the exact format. Follow it precisely.
+
+The workspace ROADMAP.md captures only work that spans multiple repos. An item belongs here when it requires coordinated changes across two or more repos, or when it is a workspace-wide initiative that no single repo owns.
+
+To populate the roadmap:
+1. Review each repo's ROADMAP.md (if present) for items that mention other repos, cross-repo dependencies, or shared infrastructure.
+2. Review the cross-repo contracts from the AGENTS.md analysis for planned changes or migrations.
+3. Ask the user about any cross-repo work in progress or planned that is not captured in per-repo roadmaps.
+
+Rules:
+- Only include items that genuinely span repos. Single-repo work stays in that repo's ROADMAP.md.
+- Every claim must come from per-repo roadmaps, cross-repo dependencies, or direct user input.
+- If no cross-repo work items exist, create the file with empty NOW/NEXT/LATER/PARKED sections and state that in the System summary.
+- Keep the file under 80 lines.
+- Flag anything inferred rather than confirmed with **[INFERRED]**.
+
+### 3.3 CLAUDE.md
 
 Create a CLAUDE.md in this directory containing only:
 
@@ -87,11 +106,12 @@ Fix any FAIL findings. Present the results to the user only after the eval passe
 
 ## Phase 4: Present and Confirm
 
-Present the workspace AGENTS.md to the user. Highlight:
+Present the workspace AGENTS.md and ROADMAP.md to the user. Highlight:
 
 - Which repos were included and which were missing context
 - Cross-repo contracts found (or the absence of them)
 - Shared conventions extracted
+- Cross-repo roadmap items found (or the absence of them)
 - Any claims marked **[INFERRED]**
 
 Ask: "Does this match how these repos relate? Anything wrong or missing?"
@@ -103,5 +123,6 @@ Re-run this skill when:
 - A new repo is added to workspace.json
 - A repo's AGENTS.md changes significantly (new cross-repo dependencies, changed conventions)
 - Cross-repo contracts change (new shared types, API changes)
+- Cross-repo work items change (new migrations, completed initiatives, changed sequencing)
 
-The workspace AGENTS.md should never be more than one significant change out of date.
+The workspace AGENTS.md and ROADMAP.md should never be more than one significant change out of date.

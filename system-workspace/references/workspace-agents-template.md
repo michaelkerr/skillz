@@ -20,7 +20,7 @@ The top-level heading (`#`) is the workspace or system name.
 ## What NOT to include
 
 - Per-repo details (stack, structure, commands, module guides) -- those belong in each repo's own AGENTS.md
-- Product strategy or roadmap content
+- Roadmap content -- that belongs in the workspace ROADMAP.md
 - Speculative content about future integrations
 - Progress tracking or session notes
 

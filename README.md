@@ -1,6 +1,5 @@
 Skills in this repo:
-1. [product-startup](https://github.com/michaelkerr/skillz/tree/main/product-startup) -  Before any code is written, run a structured clarity conversation covering the problem, users, core flow, prototype success criteria, and constraints, then produce a README.md, CLAUDE.md, and sequenced MVP plan for user confirmation before initializing a new repo and starting implementation.
-2. REDACTED
-3. REDACTED
-4. REDACTED
-5. REDACTED
+1. [product-startup](https://github.com/michaelkerr/skillz/tree/main/product-startup) — **Deprecated.** Use product-discovery instead.
+2. [product-discovery](https://github.com/michaelkerr/skillz/tree/main/product-discovery) — Run a structured discovery conversation before writing code — produces a sequenced build plan, AGENTS.md context file, and a test-first build loop to work through it. **Why it replaces product-startup:** product-startup was good, but had room to improve. product-discovery improves with evals/tests that push back until answers are concrete, outputs tool-agnostic AGENTS.md instead of Claude-specific CLAUDE.md, adds per-step tests and dependency tracking to the build plan, includes eval scripts to validate output quality, and carries through into a build loop instead of handing you files and walking away.
+4. [product-evolution](https://github.com/michaelkerr/skillz/tree/main/product-evolution) — When a product outgrows its build plan, restructure for operational maturity. Replaces the linear build plan with priority-bucketed ROADMAP.md, adds ARCHITECTURE.md and DECISIONS.md, and shifts to a lighter operating loop. Use when BUILD_PLAN.md has 10+ completed steps and new work is mostly independent.
+5. [system-workspace](https://github.com/michaelkerr/skillz/tree/main/system-workspace) — Generate workspace-level context for a multi-repo system. Reads each repo's AGENTS.md and produces a thin workspace AGENTS.md capturing only cross-cutting concerns: shared conventions, cross-repo contracts, and workspace-wide constraints.

@@ -15,13 +15,27 @@ Generate workspace-level context that ties multiple repos together. Each repo al
 
 Do not use this for single-repo projects. Each repo's own AGENTS.md is sufficient on its own.
 
-## Phase 1: Read the Manifest
-
-Read `workspace.json` in the current directory. It lists the repos in this workspace.
+## Phase 1: Read or Create the Manifest
 
 Read `references/workspace-schema.json` for the expected format.
 
-If `workspace.json` does not exist, ask the user which repos belong to this workspace and create it. Use relative paths from the workspace root to each repo.
+Check whether `workspace.json` exists in the current directory.
+
+### If workspace.json exists
+
+Read it. Validate that it matches the schema (has a `repos` array with at least two entries, each with `path` and `name`). If invalid, tell the user what's wrong and fix it with them before continuing.
+
+### If workspace.json does not exist
+
+Walk the user through creating one:
+
+1. Scan the parent directory for sibling directories that look like repos (contain a `.git` directory, `package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, or similar project markers). Present the list as candidates.
+2. Ask the user which of these repos belong to this workspace. They may also add paths not in the scan results.
+3. For each selected repo, derive a short `name` from the directory name and compute the `path` relative to this workspace directory (e.g., `../my-api`).
+4. Confirm the final list with the user before writing.
+5. Write `workspace.json` to the current directory matching the schema.
+
+If there are fewer than two repos, stop. A workspace-level context file is not useful for a single repo.
 
 ## Phase 2: Read Per-Repo Context
 

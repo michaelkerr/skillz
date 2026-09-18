@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Delivery Workflow Event",
+  "description": "Single event entry in .workflow/events.jsonl. One JSON object per line. The append-only event log is the source of truth; state.json is a derived projection.",
+  "type": "object",
+  "required": ["event_id", "timestamp", "type", "actor"],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt-[a-f0-9]{12}$",
+      "description": "Unique event identifier."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["init", "transition", "item_transition", "item_add", "evidence", "note", "block", "resume", "waive", "abort", "migrate"],
+      "description": "Event type. init = workflow created. transition = top-level state change. item_transition = work-item state change. item_add = new work item. evidence = evidence recorded. note = freeform annotation. block/resume = blocked overlay. waive = guard or item waiver. abort = workflow aborted. migrate = migrated from legacy format."
+    },
+    "from_state": {
+      "type": ["string", "null"],
+      "description": "Source state for transition events."
+    },
+    "to_state": {
+      "type": ["string", "null"],
+      "description": "Target state for transition events."
+    },
+    "item_id": {
+      "type": ["string", "null"],
+      "pattern": "^WI-\\d{3}$",
+      "description": "Work item ID for item_transition and item_add events."
+    },
+    "guard_results": {
+      "type": ["object", "null"],
+      "description": "Guard evaluation results for this transition.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["pass", "fail", "not_applicable", "waived"]
+      }
+    },
+    "evidence_keys": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "References to evidence that justifies this event."
+    },
+    "idempotency_key": {
+      "type": ["string", "null"],
+      "description": "Hash-based key to prevent duplicate transitions. Format: workflow_id:revision:from-to."
+    },
+    "forced": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if a guard was overridden by the user."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "description": "Human-readable reason for the event."
+    },
+    "actor": {
+      "type": "string",
+      "enum": ["user", "agent", "system"],
+      "description": "Who initiated the event."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "State revision after this event was applied."
+    },
+    "data": {
+      "type": ["object", "null"],
+      "description": "Additional structured data specific to the event type.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

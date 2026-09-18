@@ -1,7 +1,13 @@
 ---
 name: product-evolution
-description: When a product outgrows its build plan, restructure coordination artifacts for operational maturity. Replace the linear step sequence with priority-based work management, add architecture and decision documentation, and shift to a lighter operating loop. Use when BUILD_PLAN.md has 10+ completed steps, new work is mostly independent, or the user spends more time maintaining the plan than following it. Do NOT use for projects that have not reached a working core product.
+description: "[DEPRECATED — use product-delivery instead] When a product outgrows its build plan, restructure coordination artifacts for operational maturity. Replace the linear step sequence with priority-based work management, add architecture and decision documentation, and shift to a lighter operating loop. Use when BUILD_PLAN.md has 10+ completed steps, new work is mostly independent, or the user spends more time maintaining the plan than following it. Do NOT use for projects that have not reached a working core product."
 ---
+
+> **DEPRECATED**: This skill has been replaced by **product-delivery**, which
+> unifies product-discovery and product-evolution into a single state-machine
+> lifecycle. Existing projects using ROADMAP.md can migrate with
+> `workflow init --from-migration`. This skill will remain available but will
+> not receive updates.
 
 # Product Evolution
 

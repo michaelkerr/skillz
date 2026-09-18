@@ -1,7 +1,13 @@
 ---
 name: product-discovery
-description: Walk through a structured product discovery conversation before writing any code, then produce a sequenced build plan and initial AGENTS.md context file. Use this skill whenever someone wants to start a new product, app, tool, or prototype from scratch, or says things like "I want to build...", "let's start a new project", "help me plan an app", "new product idea", or "I have an idea for...". Also trigger when someone has described what they want to build and is about to jump straight into code -- redirect them through this process first. Do NOT use for adding features to an existing codebase or for non-software projects.
+description: "[DEPRECATED — use product-delivery instead] Walk through a structured product discovery conversation before writing any code, then produce a sequenced build plan and initial AGENTS.md context file. Use this skill whenever someone wants to start a new product, app, tool, or prototype from scratch, or says things like \"I want to build...\", \"let's start a new project\", \"help me plan an app\", \"new product idea\", or \"I have an idea for...\". Also trigger when someone has described what they want to build and is about to jump straight into code -- redirect them through this process first. Do NOT use for adding features to an existing codebase or for non-software projects."
 ---
+
+> **DEPRECATED**: This skill has been replaced by **product-delivery**, which
+> unifies product-discovery and product-evolution into a single state-machine
+> lifecycle. New projects should use product-delivery instead. Existing
+> projects using BUILD_PLAN.md can migrate with `workflow init --from-migration`.
+> This skill will remain available but will not receive updates.
 
 # Product Discovery
 

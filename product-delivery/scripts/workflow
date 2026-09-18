@@ -1,0 +1,347 @@
+#!/usr/bin/env python3
+"""
+Delivery Workflow CLI
+
+Backward-compatible CLI wrapper around the product_delivery engine.
+For new integrations, use the MCP server instead:
+
+    uvx product-delivery                    # start MCP server
+    python -m product_delivery              # same thing
+
+This CLI remains for agents that shell out or environments without MCP.
+
+Usage:
+    workflow init [--type greenfield|evolution] [--from-migration]
+    workflow status [--json]
+    workflow next
+    workflow transition <target> [--evidence KEY=PATH ...] [--force] [--reason TEXT]
+    workflow item add <name> [--ac AC-NNN ...] [--risk RISK-NNN ...]
+    workflow item list [--state STATE]
+    workflow item transition <item-id> <target> [--reason TEXT]
+    workflow item waive <item-id> --approver TEXT --reason TEXT
+    workflow check [--json]
+    workflow render
+    workflow block --reason TEXT --owner TEXT
+    workflow resume [--reason TEXT]
+    workflow waive <guard> --approver TEXT --reason TEXT
+    workflow close [--reason TEXT]
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+# Try to import the installed package; fall back to inline engine for standalone use.
+try:
+    from product_delivery import engine
+except ImportError:
+    # Running as standalone script — add src/ to path
+    _script_dir = Path(__file__).resolve().parent.parent / "src"
+    if _script_dir.exists():
+        sys.path.insert(0, str(_script_dir))
+    from product_delivery import engine
+
+
+PROJECT_DIR = Path.cwd()
+
+
+def _handle_error(e):
+    print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)
+
+
+def cmd_init(args):
+    try:
+        result = engine.init_workflow(
+            PROJECT_DIR,
+            project_type=getattr(args, "type", None),
+            from_migration=getattr(args, "from_migration", False),
+        )
+        print(f"Workflow {result['workflow_id']} initialized.")
+        print(f"  Phase: {result['phase']}")
+        print(f"  Type:  {result['project_type'] or 'undetermined'}")
+        if result.get("migrated_from"):
+            print(f"  Migrated from: {result['migrated_from']}")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_status(args):
+    try:
+        result = engine.get_status(PROJECT_DIR)
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2))
+            return
+
+        print(f"Workflow: {result['workflow_id']}")
+        print(f"Phase:    {result['phase']}")
+        print(f"Status:   {result['status']}")
+        print(f"Type:     {result['project_type'] or 'undetermined'}")
+        print(f"Revision: {result['revision']}")
+
+        if result["phase"] == "blocked":
+            print(f"Blocked:  {result.get('blocked_reason', '?')}")
+            print(f"Owner:    {result.get('blocked_owner', '?')}")
+            print(f"Resume → {result.get('resume_state', '?')}")
+
+        items = result.get("work_items", {})
+        if items:
+            print(f"\nWork Items ({len(items)}):")
+            for wid, item in items.items():
+                print(f"  {wid}: {item['name']} [{item['state']}]")
+
+        summary = result.get("work_items_summary", {})
+        if summary.get("total", 0) > 0:
+            print(f"\n  Progress: {summary['accepted']}/{summary['total']} accepted, "
+                  f"{summary['in_progress']} in progress, {summary['blocked']} blocked")
+
+        events = result.get("recent_events", [])
+        if events:
+            print(f"\nRecent Events:")
+            for e in events:
+                print(f"  [{e['timestamp'][:19]}] {e['type']}: {e.get('reason', '-')}")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_next(args):
+    try:
+        result = engine.get_next_transitions(PROJECT_DIR)
+        print(json.dumps(result, indent=2))
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_transition(args):
+    try:
+        result = engine.do_transition(
+            PROJECT_DIR,
+            args.target,
+            evidence=getattr(args, "evidence", None),
+            force=getattr(args, "force", False),
+            reason=getattr(args, "reason", None),
+        )
+        if result.get("idempotent"):
+            print(f"Transition {result['transition']} already recorded. No change.")
+        else:
+            print(f"Transitioned: {result['transition']} (revision {result['revision']})")
+            if result.get("forced"):
+                print("  (forced past failed guards)")
+    except engine.GuardFailedError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        for name, status in e.guard_results.items():
+            print(f"  {name}: {status}", file=sys.stderr)
+        sys.exit(1)
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_item(args):
+    subcmd = args.item_subcmd
+    try:
+        if subcmd == "add":
+            result = engine.add_item(
+                PROJECT_DIR,
+                args.name,
+                acceptance_criteria=getattr(args, "ac", None),
+                risks=getattr(args, "risk", None),
+            )
+            print(f"Added {result['item_id']}: {result['name']} [{result['state']}]")
+
+        elif subcmd == "list":
+            result = engine.list_items(PROJECT_DIR, getattr(args, "state", None))
+            if not result["items"]:
+                print("No work items.")
+            else:
+                for item in result["items"]:
+                    ac = ", ".join(item.get("acceptance_criteria", []))
+                    print(f"  {item['id']}: {item['name']} [{item['state']}] AC: {ac or 'none'}")
+
+        elif subcmd == "transition":
+            result = engine.transition_item(
+                PROJECT_DIR, args.item_id, args.target,
+                reason=getattr(args, "reason", None),
+            )
+            if result.get("idempotent"):
+                print(f"Item transition {result['transition']} already recorded.")
+            else:
+                print(f"{result['item_id']}: {result['transition']} (revision {result['revision']})")
+
+        elif subcmd == "waive":
+            result = engine.waive_item(PROJECT_DIR, args.item_id, args.approver, args.reason)
+            print(f"{result['item_id']}: waived by {result['approver']}")
+
+        else:
+            print(f"Error: Unknown item subcommand: {subcmd}", file=sys.stderr)
+            sys.exit(2)
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_check(args):
+    try:
+        result = engine.check_guards(PROJECT_DIR)
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2))
+            return
+
+        if result.get("terminal"):
+            print(f"Phase '{result['phase']}' is terminal. No guards to check.")
+            return
+        if result.get("blocked"):
+            print("Phase is blocked. Resume to check guards.")
+            return
+
+        for transition, info in result["transitions"].items():
+            status = "READY" if info["ready"] else "BLOCKED"
+            print(f"\n{transition}: {status}")
+            for name, guard_status in info["guards"].items():
+                marker = "✓" if guard_status in ("pass", "waived", "not_applicable") else "✗"
+                print(f"  {marker} {name}: {guard_status}")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_render(args):
+    try:
+        print(engine.render_status(PROJECT_DIR))
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_block(args):
+    try:
+        result = engine.block_workflow(PROJECT_DIR, args.reason, args.owner)
+        print(f"Blocked: {result['transition']} (reason: {result['reason']}, owner: {result['owner']})")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_resume(args):
+    try:
+        result = engine.resume_workflow(PROJECT_DIR, getattr(args, "reason", None))
+        print(f"Resumed: {result['transition']} (revision {result['revision']})")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_waive(args):
+    try:
+        result = engine.waive_guard(PROJECT_DIR, args.guard, args.approver, args.reason)
+        print(f"Waived guard '{result['guard']}' (approver: {result['approver']})")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def cmd_close(args):
+    try:
+        result = engine.close_workflow(
+            PROJECT_DIR,
+            reason=getattr(args, "reason", None),
+            force=getattr(args, "force", False),
+        )
+        if result.get("message"):
+            print(result["message"])
+        else:
+            print(f"Closed: {result['transition']} (revision {result['revision']})")
+    except engine.WorkflowError as e:
+        _handle_error(e)
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(prog="workflow", description="Product Delivery Workflow CLI")
+    sub = parser.add_subparsers(dest="command")
+
+    p_init = sub.add_parser("init", help="Initialize a new workflow")
+    p_init.add_argument("--type", choices=["greenfield", "evolution"], help="Project type")
+    p_init.add_argument("--from-migration", action="store_true", help="Migrate from legacy artifacts")
+
+    p_status = sub.add_parser("status", help="Show workflow status")
+    p_status.add_argument("--json", action="store_true", help="Output as JSON")
+
+    sub.add_parser("next", help="Show allowed transitions and guard status")
+
+    p_trans = sub.add_parser("transition", help="Attempt a state transition")
+    p_trans.add_argument("target", help="Target state")
+    p_trans.add_argument("--evidence", nargs="*", help="Evidence keys (KEY=PATH)")
+    p_trans.add_argument("--force", action="store_true", help="Force past failed guards")
+    p_trans.add_argument("--reason", help="Reason for transition")
+
+    p_item = sub.add_parser("item", help="Manage work items")
+    item_sub = p_item.add_subparsers(dest="item_subcmd")
+
+    p_item_add = item_sub.add_parser("add", help="Add a work item")
+    p_item_add.add_argument("name", help="Work item name")
+    p_item_add.add_argument("--ac", nargs="*", help="Acceptance criteria IDs")
+    p_item_add.add_argument("--risk", nargs="*", help="Risk IDs")
+
+    p_item_list = item_sub.add_parser("list", help="List work items")
+    p_item_list.add_argument("--state", help="Filter by state")
+
+    p_item_trans = item_sub.add_parser("transition", help="Transition a work item")
+    p_item_trans.add_argument("item_id", help="Work item ID (WI-NNN)")
+    p_item_trans.add_argument("target", help="Target state")
+    p_item_trans.add_argument("--reason", help="Reason for transition")
+
+    p_item_waive = item_sub.add_parser("waive", help="Waive a work item in review")
+    p_item_waive.add_argument("item_id", help="Work item ID (WI-NNN)")
+    p_item_waive.add_argument("--approver", required=True, help="Who approved")
+    p_item_waive.add_argument("--reason", required=True, help="Reason for waiver")
+
+    p_check = sub.add_parser("check", help="Validate guards")
+    p_check.add_argument("--json", action="store_true", help="Output as JSON")
+
+    sub.add_parser("render", help="Human-readable status summary")
+
+    p_block = sub.add_parser("block", help="Enter blocked state")
+    p_block.add_argument("--reason", required=True, help="Why blocked")
+    p_block.add_argument("--owner", required=True, help="Who resolves it")
+
+    p_resume = sub.add_parser("resume", help="Resume from blocked")
+    p_resume.add_argument("--reason", help="Reason for resuming")
+
+    p_waive = sub.add_parser("waive", help="Waive a transition guard")
+    p_waive.add_argument("guard", help="Guard name to waive")
+    p_waive.add_argument("--approver", required=True, help="Who approved")
+    p_waive.add_argument("--reason", required=True, help="Reason for waiver")
+
+    p_close = sub.add_parser("close", help="Close the workflow")
+    p_close.add_argument("--reason", help="Reason for closing")
+    p_close.add_argument("--force", action="store_true", help="Force from non-stabilize")
+
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        sys.exit(2)
+
+    commands = {
+        "init": cmd_init,
+        "status": cmd_status,
+        "next": cmd_next,
+        "transition": cmd_transition,
+        "item": cmd_item,
+        "check": cmd_check,
+        "render": cmd_render,
+        "block": cmd_block,
+        "resume": cmd_resume,
+        "waive": cmd_waive,
+        "close": cmd_close,
+    }
+
+    fn = commands.get(args.command)
+    if fn:
+        fn(args)
+    else:
+        parser.print_help()
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()

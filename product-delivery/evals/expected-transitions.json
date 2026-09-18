@@ -1,0 +1,65 @@
+{
+  "greenfield_happy_path": [
+    {"from": null, "to": "intake", "type": "init"},
+    {"from": "intake", "to": "discover", "type": "transition"},
+    {"from": "discover", "to": "frame", "type": "transition"},
+    {"from": "frame", "to": "plan", "type": "transition"},
+    {"from": "plan", "to": "deliver", "type": "transition"},
+    {"from": "deliver", "to": "release", "type": "transition"},
+    {"from": "release", "to": "stabilize", "type": "transition"},
+    {"from": "stabilize", "to": "closed", "type": "transition"}
+  ],
+  "evolution_happy_path": [
+    {"from": null, "to": "intake", "type": "init"},
+    {"from": "intake", "to": "discover", "type": "transition"},
+    {"from": "discover", "to": "frame", "type": "transition"},
+    {"from": "frame", "to": "plan", "type": "transition"},
+    {"from": "plan", "to": "deliver", "type": "transition"},
+    {"from": "deliver", "to": "release", "type": "transition"},
+    {"from": "release", "to": "stabilize", "type": "transition"},
+    {"from": "stabilize", "to": "closed", "type": "transition"}
+  ],
+  "blocked_resume": [
+    {"from": "deliver", "to": "blocked", "type": "block"},
+    {"from": "blocked", "to": "deliver", "type": "resume"}
+  ],
+  "work_item_happy_path": [
+    {"from": null, "to": "ready", "type": "item_add"},
+    {"from": "ready", "to": "implementing", "type": "item_transition"},
+    {"from": "implementing", "to": "verifying", "type": "item_transition"},
+    {"from": "verifying", "to": "reviewing", "type": "item_transition"},
+    {"from": "reviewing", "to": "accepted", "type": "item_transition"}
+  ],
+  "work_item_rework": [
+    {"from": null, "to": "ready", "type": "item_add"},
+    {"from": "ready", "to": "implementing", "type": "item_transition"},
+    {"from": "implementing", "to": "verifying", "type": "item_transition"},
+    {"from": "verifying", "to": "rework", "type": "item_transition"},
+    {"from": "rework", "to": "implementing", "type": "item_transition"},
+    {"from": "implementing", "to": "verifying", "type": "item_transition"},
+    {"from": "verifying", "to": "reviewing", "type": "item_transition"},
+    {"from": "reviewing", "to": "accepted", "type": "item_transition"}
+  ],
+  "work_item_waived": [
+    {"from": null, "to": "ready", "type": "item_add"},
+    {"from": "ready", "to": "implementing", "type": "item_transition"},
+    {"from": "implementing", "to": "verifying", "type": "item_transition"},
+    {"from": "verifying", "to": "reviewing", "type": "item_transition"},
+    {"from": "reviewing", "to": "waived", "type": "waive"}
+  ],
+  "stabilize_to_deliver_loop": [
+    {"from": "deliver", "to": "release", "type": "transition"},
+    {"from": "release", "to": "stabilize", "type": "transition"},
+    {"from": "stabilize", "to": "deliver", "type": "transition"},
+    {"from": "deliver", "to": "release", "type": "transition"},
+    {"from": "release", "to": "stabilize", "type": "transition"},
+    {"from": "stabilize", "to": "closed", "type": "transition"}
+  ],
+  "abort_from_plan": [
+    {"from": null, "to": "intake", "type": "init"},
+    {"from": "intake", "to": "discover", "type": "transition"},
+    {"from": "discover", "to": "frame", "type": "transition"},
+    {"from": "frame", "to": "plan", "type": "transition"},
+    {"from": "plan", "to": "aborted", "type": "transition"}
+  ]
+}

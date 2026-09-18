@@ -1,0 +1,283 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Delivery Workflow State",
+  "description": "Canonical state record for the product-delivery workflow. Lives at .workflow/state.json in the target project. This is a projection of the append-only event log and can be rebuilt from events.jsonl.",
+  "type": "object",
+  "required": ["schema_version", "workflow_id", "revision", "phase", "status", "created_at", "updated_at"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "workflow_id": {
+      "type": "string",
+      "pattern": "^wf-[a-f0-9]{8}$",
+      "description": "Unique workflow instance identifier."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonically increasing counter. Incremented on every state mutation. Used for optimistic concurrency control."
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["intake", "discover", "frame", "plan", "deliver", "release", "stabilize", "closed", "blocked", "aborted"],
+      "description": "Current top-level state in the lifecycle machine."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "blocked", "terminal"],
+      "description": "Derived from phase. active = intake through stabilize. blocked = blocked. terminal = closed or aborted."
+    },
+    "resume_state": {
+      "type": ["string", "null"],
+      "enum": ["intake", "discover", "frame", "plan", "deliver", "release", "stabilize", null],
+      "description": "When phase is 'blocked', the state to resume to. Null otherwise."
+    },
+    "project_type": {
+      "type": ["string", "null"],
+      "enum": ["greenfield", "evolution", null],
+      "description": "Determined during intake. Affects which guards and template sections apply."
+    },
+    "objective": {
+      "type": ["string", "null"],
+      "description": "One-sentence project objective."
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "included": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "brief": {
+      "type": ["object", "null"],
+      "description": "Project brief fields captured during intake/discover/frame.",
+      "properties": {
+        "who": { "type": "string" },
+        "problem": { "type": "string" },
+        "workaround": { "type": "string" },
+        "core_interaction": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "input": { "type": "string" },
+            "output": { "type": "string" },
+            "hard_part": {
+              "type": "string",
+              "enum": ["input", "processing", "output"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "platform": { "type": "string" },
+            "stack": { "type": "string" },
+            "data": { "type": "string" },
+            "users": { "type": "string" },
+            "timeline": {
+              "type": "string",
+              "enum": ["exploring", "shipping"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "direction": {
+          "type": ["object", "null"],
+          "description": "For evolution projects: captured during the direction conversation.",
+          "properties": {
+            "working": { "type": "string" },
+            "next": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "dragging": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "criterion"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^AC-\\d{3}$"
+          },
+          "criterion": { "type": "string" },
+          "testable": { "type": "boolean" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "met", "waived"],
+            "default": "pending"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "work_items": {
+      "type": "object",
+      "description": "Work items keyed by WI-NNN. Active during the deliver phase.",
+      "patternProperties": {
+        "^WI-\\d{3}$": {
+          "type": "object",
+          "required": ["name", "state"],
+          "properties": {
+            "name": { "type": "string" },
+            "state": {
+              "type": "string",
+              "enum": ["ready", "implementing", "verifying", "reviewing", "accepted", "blocked", "rework", "waived", "cancelled"]
+            },
+            "depends_on": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^WI-\\d{3}$"
+              }
+            },
+            "acceptance_criteria": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^AC-\\d{3}$"
+              }
+            },
+            "evidence": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "waive_reason": { "type": ["string", "null"] },
+            "waive_approver": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "status"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^RISK-\\d{3}$"
+          },
+          "description": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["open", "mitigated", "accepted"]
+          },
+          "owner": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^DEC-\\d{3}$"
+          },
+          "title": { "type": "string" },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "context": { "type": "string" },
+          "alternatives": { "type": "string" },
+          "consequences": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "waivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["guard", "approver", "reason"],
+        "properties": {
+          "guard": { "type": "string" },
+          "approver": { "type": "string" },
+          "reason": { "type": "string" },
+          "scope": { "type": "string" },
+          "risk_accepted": { "type": "string" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidence_index": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "type", "path"],
+        "properties": {
+          "key": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["brief", "synthesis", "maturity-assessment", "health-check", "direction", "plan", "context-files", "test-results", "user-confirmation", "coherence-check", "eval-results", "approval", "artifact"]
+          },
+          "path": { "type": "string" },
+          "hash": { "type": "string" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "last_transition": {
+      "type": ["string", "null"],
+      "description": "Event ID of the most recent transition event."
+    },
+    "blocked_reason": {
+      "type": ["string", "null"],
+      "description": "Reason for blocked state. Null when not blocked."
+    },
+    "blocked_owner": {
+      "type": ["string", "null"],
+      "description": "Who owns resolving the blocker."
+    },
+    "abort_reason": {
+      "type": ["string", "null"],
+      "description": "Reason for aborted state. Null when not aborted."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "migrated_from": {
+      "type": ["string", "null"],
+      "enum": ["product-discovery", "product-evolution", null],
+      "description": "Set if this workflow was migrated from a legacy skill."
+    }
+  },
+  "additionalProperties": false
+}

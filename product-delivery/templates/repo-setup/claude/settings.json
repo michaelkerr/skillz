@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "product-delivery": {
+      "command": "uvx",
+      "args": ["product-delivery"],
+      "env": {
+        "PRODUCT_DELIVERY_PROJECT_TYPE": "${PRODUCT_DELIVERY_PROJECT_TYPE}"
+      }
+    }
+  }
+}

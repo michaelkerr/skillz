@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""
+Product Delivery — Project Setup
+
+Run this once in any repo to wire up the product-delivery lifecycle.
+Detects installed harnesses, merges configs, and sets up workflow rules.
+
+Usage:
+    python3 scripts/setup                      # from the skillz repo
+    uvx product-delivery-setup                 # if published
+    curl -fsSL <url> | python3 - [--dir PATH]  # from anywhere
+
+What it does:
+    1. Adds MCP server config to .claude/settings.json and .cursor/mcp.json
+    2. Creates or appends workflow rule to AGENTS.md
+    3. Creates .env.sample and .env (if missing)
+    4. Adds .env and .workflow/ to .gitignore
+    5. Prints a summary of what changed
+
+Idempotent — safe to run multiple times. Merges into existing configs
+without clobbering other settings.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+MCP_SERVER_CONFIG = {
+    "command": "uvx",
+    "args": ["product-delivery"],
+}
+
+AGENTS_RULE = """\
+## Development Workflow
+
+This project uses the **product-delivery** lifecycle. All development
+work flows through the workflow state machine.
+
+Before starting any work:
+
+1. Call `workflow_status` to check the current state.
+2. If no workflow exists, call `workflow_init` to start one.
+3. Load the `product_delivery` prompt for full skill instructions.
+
+Rules:
+
+- Follow the workflow transitions. Do not skip states or bypass guards.
+- Use `workflow_next` to see what transitions are allowed.
+- Transition work items through the submachine:
+  ready → implementing → verifying → reviewing → accepted.
+- Run tests before and after each work item.
+- Record evidence for every transition.
+- Update AGENTS.md when new patterns emerge during delivery.
+"""
+
+ENV_SAMPLE = """\
+# Product Delivery Configuration
+# Copy to .env and customize. Do not commit .env to version control.
+#
+# All variables are prefixed PRODUCT_DELIVERY_ and are optional.
+# Precedence: environment variables > .env file > defaults.
+
+# Default project type for workflow init (greenfield or evolution).
+# Leave blank to determine during intake conversation.
+# PRODUCT_DELIVERY_PROJECT_TYPE=greenfield
+
+# Guard enforcement mode:
+#   strict - guards must pass or be explicitly waived (default)
+#   warn   - log failures but allow transitions
+#   skip   - disable guard checks entirely
+# PRODUCT_DELIVERY_GUARD_MODE=strict
+
+# Comma-separated states to skip during init (only discover and frame
+# are skippable). Useful for small projects that don't need full discovery.
+# PRODUCT_DELIVERY_SKIP_STATES=
+"""
+
+GITIGNORE_LINES = [".env", ".workflow/"]
+
+MARKER = "product-delivery** lifecycle"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def log(action: str, path: str, detail: str = ""):
+    symbol = {"create": "+", "update": "~", "skip": "·", "warn": "!"}
+    s = symbol.get(action, " ")
+    msg = f"  {s} {path}"
+    if detail:
+        msg += f"  ({detail})"
+    print(msg)
+
+
+def read_json(path: Path) -> dict:
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except (json.JSONDecodeError, ValueError):
+            return {}
+    return {}
+
+
+def write_json(path: Path, data: dict):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+# ---------------------------------------------------------------------------
+# Setup steps
+# ---------------------------------------------------------------------------
+
+def setup_mcp_config(project: Path, subdir: str, filename: str) -> str:
+    """Merge product-delivery into an MCP config file. Returns action taken."""
+    config_dir = project / subdir
+    config_path = config_dir / filename
+
+    existing = read_json(config_path)
+    servers = existing.get("mcpServers", {})
+
+    if "product-delivery" in servers:
+        log("skip", f"{subdir}/{filename}", "already configured")
+        return "skip"
+
+    servers["product-delivery"] = MCP_SERVER_CONFIG.copy()
+
+    if subdir == ".cursor":
+        servers["product-delivery"]["envFile"] = "${workspaceFolder}/.env"
+
+    existing["mcpServers"] = servers
+    write_json(config_path, existing)
+
+    action = "update" if config_path.exists() else "create"
+    log("create", f"{subdir}/{filename}", "added product-delivery server")
+    return action
+
+
+def setup_agents_md(project: Path) -> str:
+    """Create or append the workflow rule to AGENTS.md."""
+    agents_path = project / "AGENTS.md"
+
+    if agents_path.exists():
+        content = agents_path.read_text()
+        if MARKER in content:
+            log("skip", "AGENTS.md", "workflow rule already present")
+            return "skip"
+        with open(agents_path, "a") as f:
+            f.write("\n\n" + AGENTS_RULE)
+        log("update", "AGENTS.md", "appended workflow rule")
+        return "update"
+    else:
+        agents_path.write_text(f"# {project.name}\n\n{AGENTS_RULE}")
+        log("create", "AGENTS.md", "created with workflow rule")
+        return "create"
+
+
+def setup_env(project: Path) -> str:
+    """Create .env.sample and .env if they don't exist."""
+    sample_path = project / ".env.sample"
+    env_path = project / ".env"
+    actions = []
+
+    if not sample_path.exists():
+        sample_path.write_text(ENV_SAMPLE)
+        log("create", ".env.sample")
+        actions.append("create")
+    else:
+        log("skip", ".env.sample", "already exists")
+
+    if not env_path.exists():
+        env_path.write_text(ENV_SAMPLE)
+        log("create", ".env", "copied from sample")
+        actions.append("create")
+    else:
+        log("skip", ".env", "already exists")
+
+    return "create" if "create" in actions else "skip"
+
+
+def setup_gitignore(project: Path) -> str:
+    """Add .env and .workflow/ to .gitignore."""
+    gi_path = project / ".gitignore"
+    existing_lines = []
+    if gi_path.exists():
+        existing_lines = gi_path.read_text().splitlines()
+
+    added = []
+    for line in GITIGNORE_LINES:
+        if line not in existing_lines:
+            added.append(line)
+
+    if not added:
+        log("skip", ".gitignore", "entries already present")
+        return "skip"
+
+    with open(gi_path, "a") as f:
+        if existing_lines and existing_lines[-1].strip():
+            f.write("\n")
+        f.write("\n".join(added) + "\n")
+
+    log("update" if gi_path.exists() else "create", ".gitignore",
+        f"added {', '.join(added)}")
+    return "update"
+
+
+def check_prerequisites():
+    """Warn about missing tools."""
+    warnings = []
+    if not shutil.which("uv") and not shutil.which("uvx"):
+        warnings.append(
+            "uv/uvx not found. Install from https://docs.astral.sh/uv/\n"
+            "    The MCP server needs uvx to run."
+        )
+    return warnings
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def run_setup(project: Path):
+    print(f"\n  Product Delivery Setup")
+    print(f"  Project: {project}\n")
+
+    warnings = check_prerequisites()
+    for w in warnings:
+        log("warn", w)
+    if warnings:
+        print()
+
+    results = {}
+
+    # MCP configs
+    results["claude"] = setup_mcp_config(project, ".claude", "settings.json")
+    results["cursor"] = setup_mcp_config(project, ".cursor", "mcp.json")
+
+    # AGENTS.md
+    results["agents"] = setup_agents_md(project)
+
+    # .env
+    results["env"] = setup_env(project)
+
+    # .gitignore
+    results["gitignore"] = setup_gitignore(project)
+
+    # Summary
+    created = sum(1 for v in results.values() if v == "create")
+    updated = sum(1 for v in results.values() if v == "update")
+    skipped = sum(1 for v in results.values() if v == "skip")
+
+    print(f"\n  Done: {created} created, {updated} updated, {skipped} unchanged.")
+
+    if created or updated:
+        print("\n  Next steps:")
+        print("    1. Review .env and uncomment settings you want")
+        print("    2. Commit .env.sample, .claude/, .cursor/, AGENTS.md")
+        print("    3. Open the project in Claude Code or Cursor")
+        print("    4. The agent will see the MCP server and follow the workflow")
+
+    print()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="product-delivery-setup",
+        description="Set up product-delivery lifecycle in a project repo.",
+    )
+    parser.add_argument(
+        "--dir", "-d",
+        type=Path,
+        default=Path.cwd(),
+        help="Project directory (default: current directory)",
+    )
+    args = parser.parse_args()
+    project = args.dir.resolve()
+
+    if not project.is_dir():
+        print(f"Error: {project} is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    run_setup(project)
+
+
+if __name__ == "__main__":
+    main()

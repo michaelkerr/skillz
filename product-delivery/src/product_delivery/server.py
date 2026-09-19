@@ -3,9 +3,17 @@ Product Delivery MCP Server
 
 Exposes the delivery workflow state machine as MCP tools, resources,
 and prompts. Any harness that speaks MCP gets identical behavior.
+
+Configuration via .env in the project directory (or PRODUCT_DELIVERY_*
+environment variables):
+
+    PRODUCT_DELIVERY_PROJECT_TYPE=greenfield|evolution
+    PRODUCT_DELIVERY_GUARD_MODE=strict|warn|skip
+    PRODUCT_DELIVERY_SKIP_STATES=discover,frame
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -22,8 +30,10 @@ mcp = MCPServer(
     instructions=(
         "Unified lifecycle server for software products. Provides tools to "
         "manage a hierarchical state machine from intake through delivery and "
-        "stabilization, with a nested work-item submachine. Read the "
-        "product-delivery prompt for conversational skill instructions."
+        "stabilization, with a nested work-item submachine. "
+        "To set up a new project: call workflow_setup(dry_run=True) to preview, "
+        "then workflow_setup(dry_run=False) to apply, then workflow_init to start. "
+        "Read the product-delivery prompt for conversational skill instructions."
     ),
 )
 
@@ -32,6 +42,40 @@ PROJECT_DIR = Path.cwd()
 
 # Locate the package's static files (references/, templates/)
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Server config loaded from .env / environment
+CONFIG: dict[str, str] = {}
+
+
+def _load_env(project_dir: Path) -> dict[str, str]:
+    """Load config from .env file and environment variables.
+
+    Precedence: env vars > .env file > defaults.
+    """
+    config: dict[str, str] = {}
+
+    env_file = project_dir / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip("\"'")
+                if key.startswith("PRODUCT_DELIVERY_"):
+                    config[key] = value
+
+    for key, value in os.environ.items():
+        if key.startswith("PRODUCT_DELIVERY_"):
+            config[key] = value
+
+    return config
+
+
+def _get_config(key: str, default: str = "") -> str:
+    return CONFIG.get(f"PRODUCT_DELIVERY_{key}", default)
 
 
 def _error_response(e: Exception) -> str:
@@ -51,9 +95,12 @@ def workflow_init(
 
     Args:
         project_type: "greenfield" or "evolution". Leave empty to determine during intake.
+                      Can be defaulted via PRODUCT_DELIVERY_PROJECT_TYPE in .env.
         from_migration: Detect existing BUILD_PLAN.md or ROADMAP.md and migrate.
     """
     try:
+        if project_type is None:
+            project_type = _get_config("PROJECT_TYPE") or None
         result = engine.init_workflow(PROJECT_DIR, project_type, from_migration)
         return json.dumps(result, indent=2)
     except engine.WorkflowError as e:
@@ -285,6 +332,61 @@ def workflow_render() -> str:
         return _error_response(e)
 
 
+@mcp.tool()
+def workflow_config() -> str:
+    """Show the active configuration from .env and environment variables.
+
+    Returns all PRODUCT_DELIVERY_* settings and where they came from.
+    """
+    return json.dumps({
+        "project_dir": str(PROJECT_DIR),
+        "config": CONFIG,
+        "env_file": str(PROJECT_DIR / ".env"),
+        "env_file_exists": (PROJECT_DIR / ".env").exists(),
+    }, indent=2)
+
+
+@mcp.tool()
+def workflow_setup(dry_run: bool = True) -> str:
+    """Set up product-delivery in the current project.
+
+    Creates or updates: .claude/settings.json, .cursor/mcp.json,
+    AGENTS.md (workflow rule), .env.sample, .env, and .gitignore.
+    Merges into existing files without clobbering other settings.
+    Idempotent — safe to run multiple times.
+
+    Call with dry_run=True first to preview changes, then with
+    dry_run=False to apply them. Present the preview to the user
+    before applying.
+
+    Args:
+        dry_run: If True, preview what would change without writing.
+                 If False, apply the changes.
+    """
+    from . import setup
+
+    if dry_run:
+        result = setup.plan_setup(PROJECT_DIR)
+        result["mode"] = "preview"
+        if result["already_setup"]:
+            result["message"] = "Project is already set up for product-delivery. No changes needed."
+        else:
+            result["message"] = (
+                f"Setup will make {result['changes_count']} change(s) to "
+                f"{result['project_name']}. Call workflow_setup(dry_run=False) "
+                f"to apply."
+            )
+    else:
+        result = setup.execute_setup(PROJECT_DIR)
+        result["mode"] = "applied"
+        result["message"] = (
+            f"Setup complete. {result['applied_count']} file(s) changed. "
+            + (" ".join(result["next_steps"]))
+        )
+
+    return json.dumps(result, indent=2)
+
+
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
@@ -383,7 +485,8 @@ def product_delivery() -> str:
 # ---------------------------------------------------------------------------
 
 def run(project_dir: Path | None = None):
-    global PROJECT_DIR
+    global PROJECT_DIR, CONFIG
     if project_dir:
         PROJECT_DIR = project_dir
+    CONFIG = _load_env(PROJECT_DIR)
     mcp.run()

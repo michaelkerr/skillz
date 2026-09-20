@@ -12,7 +12,7 @@ Every transition is evidence-gated: guards check that required artifacts exist a
 
 ### MCP Server (recommended)
 
-The MCP server gives any MCP-capable harness identical behavior — 14 tools, 10 resources, and a prompt for loading the skill instructions.
+The MCP server gives any MCP-capable harness identical behavior — 19 tools, 10 resources, and a prompt for loading the skill instructions.
 
 ```bash
 # Install and run via uvx (no clone needed)
@@ -64,10 +64,13 @@ Read `SKILL.md` and follow the instructions. The skill is harness-agnostic — n
 
 ## MCP Server Reference
 
-### Tools (14)
+### Tools (19)
 
 | Tool | Purpose |
 |------|---------|
+| `workflow_detect` | Detect project state (not_setup / setup_no_workflow / active / legacy) |
+| `workflow_projects` | List all registered projects across directories |
+| `workflow_project_remove` | Remove a project from the registry |
 | `workflow_init` | Initialize a new delivery workflow |
 | `workflow_status` | Get current state, work items, events |
 | `workflow_next` | Show allowed transitions with guard status |
@@ -82,6 +85,8 @@ Read `SKILL.md` and follow the instructions. The skill is harness-agnostic — n
 | `workflow_waive_guard` | Waive a transition guard |
 | `workflow_close` | Close the workflow |
 | `workflow_render` | Render a markdown status summary |
+| `workflow_config` | Show active configuration from .env |
+| `workflow_setup` | Set up product-delivery in a project (dry_run preview + apply) |
 
 ### Resources (10)
 

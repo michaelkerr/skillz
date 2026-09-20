@@ -18,6 +18,7 @@ environment variables):
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -38,6 +39,7 @@ mcp = MCPServer(
         "it tells you whether to run setup, init, or resume. "
         "All tools accept an optional project_dir to target a specific "
         "project (defaults to the working directory). "
+        "Use workflow_projects to see all registered projects across directories. "
         "Read the product-delivery prompt for full skill instructions."
     ),
 )
@@ -50,6 +52,42 @@ PACKAGE_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Config cache per project dir
 _config_cache: dict[str, dict[str, str]] = {}
+
+# Project registry — central record of all known projects
+REGISTRY_DIR = Path.home() / ".product-delivery"
+REGISTRY_PATH = REGISTRY_DIR / "projects.json"
+
+
+def _load_registry() -> dict:
+    if REGISTRY_PATH.exists():
+        try:
+            return json.loads(REGISTRY_PATH.read_text())
+        except (json.JSONDecodeError, ValueError):
+            return {"projects": {}}
+    return {"projects": {}}
+
+
+def _save_registry(registry: dict):
+    REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
+    REGISTRY_PATH.write_text(json.dumps(registry, indent=2) + "\n")
+
+
+def _register_project(project_dir: Path, phase: str | None = None):
+    registry = _load_registry()
+    key = str(project_dir)
+    now = datetime.now(timezone.utc).isoformat()
+    if key in registry["projects"]:
+        registry["projects"][key]["last_seen"] = now
+        if phase is not None:
+            registry["projects"][key]["phase"] = phase
+    else:
+        registry["projects"][key] = {
+            "name": project_dir.name,
+            "registered_at": now,
+            "last_seen": now,
+            "phase": phase,
+        }
+    _save_registry(registry)
 
 
 def _resolve(project_dir: str | None) -> Path:
@@ -162,6 +200,8 @@ def workflow_detect(project_dir: str | None = None) -> str:
             "to preview setup, then workflow_setup(dry_run=False) to apply."
         )
 
+    _register_project(p, phase)
+
     return json.dumps({
         "project_dir": str(p),
         "project_name": p.name,
@@ -176,6 +216,99 @@ def workflow_detect(project_dir: str | None = None) -> str:
             "has_build_plan": has_build_plan,
             "has_roadmap": has_roadmap,
         },
+    }, indent=2)
+
+
+@mcp.tool()
+def workflow_projects(refresh: bool = False) -> str:
+    """List all known projects managed by this server.
+
+    Shows every project that has been detected, initialized, or set up,
+    along with its current phase and last-seen timestamp.
+
+    Args:
+        refresh: If True, re-check each project's live state from disk.
+                 If False, return cached registry data (faster).
+    """
+    registry = _load_registry()
+    projects = registry.get("projects", {})
+
+    if not projects:
+        return json.dumps({
+            "count": 0,
+            "projects": [],
+            "message": "No projects registered yet. Call workflow_detect on a project to register it.",
+        }, indent=2)
+
+    result_list = []
+    for path_str, info in projects.items():
+        entry = {
+            "project_dir": path_str,
+            "name": info.get("name", Path(path_str).name),
+            "registered_at": info.get("registered_at"),
+            "last_seen": info.get("last_seen"),
+            "phase": info.get("phase"),
+        }
+
+        if refresh:
+            p = Path(path_str)
+            if not p.exists():
+                entry["status"] = "directory_missing"
+                entry["phase"] = None
+            elif (p / ".workflow" / "state.json").exists():
+                try:
+                    status = engine.get_status(p)
+                    entry["phase"] = status.get("phase", "unknown")
+                    entry["status"] = "active"
+                    entry["work_items_summary"] = status.get("work_items_summary")
+                except engine.WorkflowError:
+                    entry["status"] = "error"
+            elif any(
+                "product-delivery" in _read_json_safe(p / sub / f).get("mcpServers", {})
+                for sub, f in [(".claude", "settings.json"), (".cursor", "mcp.json")]
+            ):
+                entry["status"] = "setup_no_workflow"
+                entry["phase"] = None
+            else:
+                entry["status"] = "not_setup"
+                entry["phase"] = None
+
+            _register_project(p, entry.get("phase"))
+
+        result_list.append(entry)
+
+    return json.dumps({
+        "count": len(result_list),
+        "projects": result_list,
+        "registry_path": str(REGISTRY_PATH),
+    }, indent=2)
+
+
+@mcp.tool()
+def workflow_project_remove(project_dir: str) -> str:
+    """Remove a project from the registry.
+
+    Does not delete any files — just removes the project from the
+    cross-project tracking list.
+
+    Args:
+        project_dir: Project directory to remove.
+    """
+    p = Path(project_dir).resolve()
+    registry = _load_registry()
+    key = str(p)
+    if key in registry["projects"]:
+        removed = registry["projects"].pop(key)
+        _save_registry(registry)
+        return json.dumps({
+            "removed": True,
+            "project_dir": key,
+            "name": removed.get("name"),
+        }, indent=2)
+    return json.dumps({
+        "removed": False,
+        "project_dir": key,
+        "message": "Project not found in registry.",
     }, indent=2)
 
 
@@ -211,6 +344,7 @@ def workflow_init(
         if project_type is None:
             project_type = _get_config(p, "PROJECT_TYPE") or None
         result = engine.init_workflow(p, project_type, from_migration)
+        _register_project(p, result.get("phase", "intake"))
         return json.dumps(result, indent=2)
     except engine.WorkflowError as e:
         return _error_response(e)
@@ -545,6 +679,7 @@ def workflow_setup(
             f"Setup complete. {result['applied_count']} file(s) changed. "
             + (" ".join(result["next_steps"]))
         )
+        _register_project(p)
 
     return json.dumps(result, indent=2)
 

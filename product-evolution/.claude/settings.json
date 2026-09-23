@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "product-delivery": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/Users/michaelkerr/Projects/skillz/product-delivery",
+        "python",
+        "-m",
+        "product_delivery"
+      ]
+    }
+  }
+}

@@ -1,3 +1,0 @@
-# Product Delivery workflow state (local, per-developer)
-.workflow/
-.env
